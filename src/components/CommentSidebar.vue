@@ -28,11 +28,11 @@
       <div class="empty-icon">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </div>
-      <p class="empty-title">Belum ada catatan</p>
-      <p class="empty-desc">Drag area atau teks pada PDF untuk menambahkan anotasi pertama.</p>
+      <!-- <p class="empty-title">Belum ada notes</p>
+      <p class="empty-desc">Drag area atau teks pada PDF untuk menambahkan anotasi pertama.</p> -->
     </div>
 
-    <!-- Empty filter state -->
+    <!-- Empty filter -->
     <div v-else-if="store.commentsByPage.length === 0" class="empty-state">
       <div class="empty-icon" style="opacity:0.25">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -41,35 +41,54 @@
       <p class="empty-desc">Tidak ada komentar dengan status "{{ currentFilterLabel }}".</p>
     </div>
 
-    <!-- Comment list grouped by page -->
-    <div v-else class="comment-list" ref="listEl">
-      <template v-for="group in store.commentsByPage" :key="group.page">
-        <!-- Page group header -->
-        <div class="page-group-header">
-          <div class="page-group-label">
+    <!-- Accordion per halaman -->
+    <div v-else class="comment-list">
+      <div
+        v-for="group in store.commentsByPage"
+        :key="group.page"
+        class="page-group"
+      >
+        <!-- Header accordion — klik untuk buka/tutup -->
+        <button
+          class="page-group-header"
+          :class="{ open: isOpen(group.page), 'has-active': groupHasActive(group) }"
+          @click="togglePage(group.page)"
+        >
+          <div class="page-group-left">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-            Halaman {{ group.page }}
+            <span class="page-group-label">Halaman {{ group.page }}</span>
+            <span class="page-group-count">{{ group.items.length }} notes</span>
           </div>
-          <span class="page-group-count">{{ group.items.length }} catatan</span>
-        </div>
+          <svg
+            class="chevron"
+            :class="{ rotated: isOpen(group.page) }"
+            width="13" height="13" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+          >
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </button>
 
-        <!-- Comments in this page -->
-        <!-- index dihitung dari sortedCommentsByNewest agar sesuai dengan badge nomor di PDF -->
-        <TransitionGroup name="comment-anim">
-          <CommentItem
-            v-for="comment in group.items"
-            :key="comment.id"
-            :comment="comment"
-            :is-active="store.activeCommentId === comment.id"
-            @click="handleCommentClick(comment.id)"
-            @delete="handleDelete(comment.id)"
-            @set-status="(s) => handleSetStatus(comment.id, s)"
-          />
-        </TransitionGroup>
-      </template>
+        <!-- List komentar — hanya tampil kalau accordion terbuka -->
+        <Transition name="accordion">
+          <div v-if="isOpen(group.page)" class="page-group-body">
+            <TransitionGroup name="comment-anim">
+              <CommentItem
+                v-for="comment in group.items"
+                :key="comment.id"
+                :comment="comment"
+                :is-active="store.activeCommentId === comment.id"
+                @click="handleCommentClick(comment.id)"
+                @delete="handleDelete(comment.id)"
+                @set-status="(s) => handleSetStatus(comment.id, s)"
+              />
+            </TransitionGroup>
+          </div>
+        </Transition>
+      </div>
     </div>
 
-    <!-- Toast notifications -->
+    <!-- Toast -->
     <Transition name="fade">
       <div v-if="toast.show" class="toast" :class="toast.type">
         <svg v-if="toast.type === 'deleted'" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
@@ -81,14 +100,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import CommentItem from './CommentItem.vue'
 import { usePdfCommentStore } from '../stores/pdfCommentStore'
 import type { ReviewStatus } from '../types/comment'
 
 defineProps<{ documentId: string }>()
 const store = usePdfCommentStore()
-const listEl = ref<HTMLElement | null>(null)
 
 const filterTabs: Array<{ key: ReviewStatus | 'all'; label: string }> = [
   { key: 'all',      label: 'Semua'    },
@@ -101,7 +119,35 @@ const currentFilterLabel = computed(() =>
   filterTabs.find(t => t.key === store.filterStatus)?.label ?? ''
 )
 
-// Toast
+// set halaman yang sedang terbuka, default semua tertutup
+const openPages = ref<Set<number>>(new Set())
+
+function isOpen(page: number) {
+  return openPages.value.has(page)
+}
+
+function togglePage(page: number) {
+  const s = new Set(openPages.value)
+  s.has(page) ? s.delete(page) : s.add(page)
+  openPages.value = s
+}
+
+// kalau ada komentar aktif di group ini, tandai headernya
+function groupHasActive(group: { page: number; items: { id: string }[] }) {
+  return group.items.some(c => c.id === store.activeCommentId)
+}
+
+// auto-buka halaman yang berisi komentar aktif saat user klik dari PDF
+watch(() => store.activeCommentId, (id) => {
+  if (!id) return
+  const comment = store.comments.find(c => c.id === id)
+  if (!comment) return
+  const s = new Set(openPages.value)
+  s.add(comment.pageNumber)
+  openPages.value = s
+})
+
+// toast
 const toast = ref({ show: false, message: '', type: 'success' as 'success' | 'deleted' | 'status' })
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -137,7 +183,6 @@ async function handleSetStatus(id: string, status: ReviewStatus) {
   overflow: hidden; flex-shrink: 0; position: relative;
 }
 
-/* Header */
 .sidebar-header {
   padding: 15px 16px 13px;
   border-bottom: 1px solid var(--color-border);
@@ -146,8 +191,8 @@ async function handleSetStatus(id: string, status: ReviewStatus) {
 }
 .sidebar-title {
   display: flex; align-items: center; gap: 8px;
-  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-  margin: 0; color: var(--color-text); letter-spacing: 0.01em;
+  font-size: 13px; font-weight: 600; margin: 0;
+  color: var(--color-text);
 }
 .total-count {
   font-family: 'JetBrains Mono', monospace; font-size: 11px;
@@ -187,38 +232,88 @@ async function handleSetStatus(id: string, status: ReviewStatus) {
   gap: 10px; color: var(--color-text-muted);
 }
 .empty-icon { opacity: 0.3; margin-bottom: 4px; }
-.empty-title {
-  font-size: 14px; font-weight: 600; color: var(--color-text);
-  margin: 0; opacity: 0.5;
-}
-.empty-desc {
-  font-size: 12px; line-height: 1.6; margin: 0; opacity: 0.6; max-width: 220px;
-}
+.empty-title { font-size: 14px; font-weight: 600; color: var(--color-text); margin: 0; opacity: 0.5; }
+.empty-desc  { font-size: 12px; line-height: 1.6; margin: 0; opacity: 0.6; max-width: 220px; }
 
-/* Comment list */
+/* Accordion list */
 .comment-list {
-  flex: 1; overflow-y: auto; padding: 10px;
-  display: flex; flex-direction: column; gap: 6px;
+  flex: 1; overflow-y: auto;
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 4px;
 }
 
-/* Page group header */
+.page-group {
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* Header accordion */
 .page-group-header {
+  width: 100%;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 10px 7px;
-  margin-top: 6px;
+  padding: 11px 14px;
   background: var(--color-text);
-  border-radius: 7px;
+  border: none; cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 10px;
 }
+
+.page-group-header.open {
+  border-radius: 10px 10px 0 0;
+}
+
+.page-group-header:hover {
+  background: #2d2520;
+}
+
+.page-group-header.has-active {
+  background: #1e3a5f;
+}
+
+.page-group-left {
+  display: flex; align-items: center; gap: 7px;
+}
+
 .page-group-label {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 700; color: white;
-  letter-spacing: 0.02em;
+  font-size: 12px; font-weight: 700; color: white; letter-spacing: 0.01em;
 }
-.page-group-label svg { opacity: 0.8; }
+
 .page-group-count {
-  font-family: 'JetBrains Mono', monospace; font-size: 9px;
-  color: rgba(255,255,255,0.6); font-weight: 500;
+  font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.85);
+  padding: 1px 7px; border-radius: 99px;
 }
+
+.page-group-header svg { opacity: 0.7; color: white; }
+
+.chevron {
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+  color: white;
+  opacity: 0.7;
+}
+.chevron.rotated { transform: rotate(180deg); }
+
+/* Body accordion */
+.page-group-body {
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 10px 10px;
+  background: var(--color-bg);
+}
+
+/* Animasi simpel — cukup fade, hindari max-height yang bikin bug */
+.accordion-enter-active { transition: opacity 0.2s ease; }
+.accordion-leave-active  { transition: opacity 0.15s ease; }
+.accordion-enter-from, .accordion-leave-to { opacity: 0; }
+
+/* Comment list animation */
+.comment-anim-enter-active, .comment-anim-leave-active { transition: all 0.2s ease; }
+.comment-anim-enter-from { opacity: 0; transform: translateY(-6px); }
+.comment-anim-leave-to   { opacity: 0; transform: translateX(16px); }
 
 /* Toast */
 .toast {
@@ -230,11 +325,6 @@ async function handleSetStatus(id: string, status: ReviewStatus) {
 .toast.deleted { background: #374151; }
 .toast.status  { background: #1d4ed8; }
 .toast.success { background: #15803d; }
-
-/* Animations */
-.comment-anim-enter-active, .comment-anim-leave-active { transition: all 0.2s ease; }
-.comment-anim-enter-from { opacity: 0; transform: translateY(-6px); }
-.comment-anim-leave-to   { opacity: 0; transform: translateX(16px); }
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
