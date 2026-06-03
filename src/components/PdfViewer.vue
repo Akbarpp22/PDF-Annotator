@@ -679,7 +679,32 @@ function handleAnnotationClick(id: string) {
 function scrollToComment(id: string) {
   const c = store.comments.find(c => c.id === id)
   if (!c) return
-  pageRefs.value.get(c.pageNumber)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+
+  const pageEl     = pageRefs.value.get(c.pageNumber)
+  const scrollEl   = scrollContainer.value
+  if (!pageEl || !scrollEl) return
+
+  const pageSize = pageSizes.value.get(c.pageNumber)
+  if (!pageSize) {
+    // fallback kalau page belum kerender
+    pageEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+
+  // hitung posisi Y anotasi di dalam halaman (dalam px)
+  // c.y adalah persentase dari atas halaman
+  const annotY = (c.y / 100) * pageSize.h
+
+  // posisi halaman relatif terhadap scroll container
+  const containerRect = scrollEl.getBoundingClientRect()
+  const pageRect      = pageEl.getBoundingClientRect()
+  const pageTopRelative = pageRect.top - containerRect.top + scrollEl.scrollTop
+
+  // target scroll: posisi anotasi di dalam halaman + sedikit padding atas
+  const PADDING  = 80
+  const targetY  = pageTopRelative + annotY - PADDING
+
+  scrollEl.scrollTo({ top: targetY, behavior: 'smooth' })
 }
 
 function globalMouseUp() {
