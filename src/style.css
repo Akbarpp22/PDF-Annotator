@@ -1,0 +1,130 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #f5f4f2;
+  --color-surface: #ffffff;
+  --color-border: #e0dbd3;
+  --color-text: #3d342c;
+  --color-text-muted: #7d6f5e;
+  --color-accent: #c8a96e;
+  --color-accent-dark: #a8864a;
+  --color-active: #2563eb;
+  --color-active-bg: rgba(37, 99, 235, 0.08);
+  --color-annotation: rgba(251, 191, 36, 0.35);
+  --color-annotation-border: #f59e0b;
+  --color-annotation-active: rgba(37, 99, 235, 0.2);
+  --color-annotation-active-border: #2563eb;
+  --color-selection: rgba(37, 99, 235, 0.15);
+  --color-selection-border: #2563eb;
+  --color-highlight: rgba(250, 204, 21, 0.45);
+  --color-highlight-active: rgba(37, 99, 235, 0.25);
+  --sidebar-width: 340px;
+  --header-height: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+#app {
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* ─── PDF.js Text Layer ─── */
+/* Styling utama ada di PdfViewer.vue scoped styles */
+/* Global rule ini hanya fallback agar teks tidak terlihat */
+.textLayer span {
+  color: transparent !important;
+}
+
+/* Annotations */
+.annotation-box {
+  position: absolute;
+  cursor: pointer;
+  border: 1.5px solid var(--color-annotation-border);
+  background: var(--color-annotation);
+  border-radius: 3px;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.annotation-box:hover {
+  background: rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+.annotation-box.active {
+  border-color: var(--color-annotation-active-border);
+  background: var(--color-annotation-active);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+}
+
+/* Highlight rects */
+.highlight-rect {
+  position: absolute;
+  pointer-events: none;
+  background: var(--color-highlight);
+  border-radius: 2px;
+  transition: background 0.15s;
+}
+
+.highlight-rect.active {
+  background: var(--color-highlight-active);
+}
+
+/* highlight wrapper diklik */
+.highlight-wrapper {
+  position: absolute;
+  cursor: pointer;
+}
+
+/* Selection rect (drag area) */
+.selection-rect {
+  position: absolute;
+  border: 2px dashed var(--color-selection-border);
+  background: var(--color-selection);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+/* Transitions */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
