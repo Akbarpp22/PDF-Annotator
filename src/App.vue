@@ -30,13 +30,14 @@
         <PdfViewer
           :pdf-url="document.pdfUrl"
           :document-id="document.documentId"
-          :class="{ 'sidebar-open': isSidebarOpen }"
+          class="pdf-area"
         />
 
         <Transition name="slide-sidebar">
           <CommentSidebar
             v-if="isSidebarOpen"
             :document-id="document.documentId"
+            class="sidebar-panel"
           />
         </Transition>
       </template>
@@ -45,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import PdfViewer from './components/PdfViewer.vue'
 import CommentSidebar from './components/CommentSidebar.vue'
@@ -53,19 +54,23 @@ import { getDocumentById } from './services/documentService'
 import { usePdfCommentStore } from './stores/pdfCommentStore'
 import type { PdfDocument } from './types/document'
 
-const commentStore = usePdfCommentStore()
-
-const document = ref<PdfDocument | null>(null)
-const loadingDoc = ref(true)
-const docError = ref<string | null>(null)
+const commentStore  = usePdfCommentStore()
+const document      = ref<PdfDocument | null>(null)
+const loadingDoc    = ref(true)
+const docError      = ref<string | null>(null)
 const isSidebarOpen = ref(true)
+
+// tutup sidebar otomatis saat layar < 768px
+function checkScreen() {
+  isSidebarOpen.value = window.innerWidth >= 768
+}
 
 async function loadDocument() {
   loadingDoc.value = true
-  docError.value = null
+  docError.value   = null
   try {
     const doc = await getDocumentById('aceh-001')
-    document.value = doc
+    document.value  = doc
     await commentStore.loadComments(doc.documentId)
   } catch (e) {
     docError.value = e instanceof Error ? e.message : 'Failed to load document'
@@ -75,7 +80,13 @@ async function loadDocument() {
 }
 
 onMounted(() => {
+  checkScreen()
+  window.addEventListener('resize', checkScreen)
   loadDocument()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkScreen)
 })
 </script>
 
@@ -94,13 +105,39 @@ onMounted(() => {
   position: relative;
 }
 
+/* PDF selalu ambil sisa ruang, min-width:0 cegah overflow */
+.pdf-area {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Sidebar: lebar fixed di desktop */
+.sidebar-panel {
+  flex-shrink: 0;
+  width: var(--sidebar-width); /* 340px */
+}
+
+/* Tablet (768px - 1199px): sidebar lebih sempit */
+@media (max-width: 1199px) {
+  .sidebar-panel {
+    width: 280px;
+  }
+}
+
+/* Tablet kecil (< 768px): sidebar full width karena sudah auto-hide di atas */
+@media (max-width: 767px) {
+  .sidebar-panel {
+    width: 240px;
+  }
+}
+
+/* State screens */
 .state-screen {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .state-inner {
   display: flex;
   flex-direction: column;
@@ -108,45 +145,24 @@ onMounted(() => {
   gap: 16px;
   color: var(--color-text-muted);
 }
-
-.state-inner.error {
-  color: #dc2626;
-}
-
-.state-label {
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
-}
-
+.state-inner.error { color: #dc2626; }
+.state-label { font-size: 14px; font-weight: 500; margin: 0; }
 .spinner {
-  width: 36px;
-  height: 36px;
+  width: 36px; height: 36px;
   border: 2px solid var(--color-border);
   border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+@keyframes spin { to { transform: rotate(360deg); } }
 .btn-primary {
   padding: 8px 20px;
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
+  background: var(--color-accent); color: white;
+  border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; font-family: inherit;
 }
-
-.btn-primary:hover {
-  background: var(--color-accent-dark);
-}
+.btn-primary:hover { background: var(--color-accent-dark); }
 
 .slide-sidebar-enter-active,
 .slide-sidebar-leave-active {

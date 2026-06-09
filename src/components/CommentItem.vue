@@ -51,7 +51,7 @@
         {{ statusLabel[comment.status] }}
       </span>
       <span v-if="lastStatusEntry" class="status-time">
-        {{ formatStatusTime(lastStatusEntry.changedAt) }}
+        {{ formatDateTime(lastStatusEntry.changedAt) }}
       </span>
     </div>
 
@@ -107,7 +107,7 @@
                 {{ h.reviewerName }}
               </span>
             </div>
-            <span class="history-time">{{ formatStatusTime(h.changedAt) }}</span>
+            <span class="history-time">{{ formatDateTime(h.changedAt) }}</span>
           </div>
         </div>
       </div>
@@ -120,7 +120,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { PdfComment, ReviewStatus } from '../types/comment'
-import { formatDateTime, formatStatusTime } from '../utils/time'
+import { formatDateTime } from '../utils/time'
 
 const props = defineProps<{
   comment: PdfComment

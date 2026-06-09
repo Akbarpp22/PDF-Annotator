@@ -179,7 +179,7 @@ const store = usePdfCommentStore()
 
 // ─── PDF state ────────────────────────────────────────────────────────
 const scrollContainer = ref<HTMLElement | null>(null)
-const scale           = ref(1.2)
+const scale           = ref(1.0)
 const totalPages      = ref(0)
 const loadingPdf      = ref(true)
 let pdfDoc: pdfjsLib.PDFDocumentProxy | null = null
@@ -251,8 +251,14 @@ async function renderPage(pageNum: number) {
   const canvas = canvasRefs.value.get(pageNum)
   if (!canvas) return
 
-  const page     = await pdfDoc.getPage(pageNum)
-  const viewport = page.getViewport({ scale: scale.value })
+  const page        = await pdfDoc.getPage(pageNum)
+  const baseViewport = page.getViewport({ scale: scale.value })
+
+  // kalau layar lebih sempit dari PDF, scale down supaya ga kepotong
+  const effectiveScale = computeEffectiveScale(baseViewport.width)
+  const viewport = effectiveScale < scale.value
+    ? page.getViewport({ scale: effectiveScale })
+    : baseViewport
 
   canvas.width  = viewport.width
   canvas.height = viewport.height
@@ -263,6 +269,17 @@ async function renderPage(pageNum: number) {
 
   await page.render({ canvasContext: canvas.getContext('2d')!, viewport }).promise
   await extractCharRects(page, viewport, pageNum)
+}
+
+// hitung scale supaya PDF muat dalam container dengan padding
+function computeEffectiveScale(pdfWidth: number): number {
+  const container = scrollContainer.value
+  if (!container) return scale.value
+  const PADDING     = 48 // kiri + kanan padding
+  const available   = container.clientWidth - PADDING
+  if (pdfWidth <= available) return scale.value
+  // scale down proporsional
+  return scale.value * (available / pdfWidth)
 }
 
 /**
@@ -350,7 +367,7 @@ async function extractCharRects(
 // ─── Zoom ─────────────────────────────────────────────────────────────
 function zoomIn()    { scale.value = Math.min(scale.value + 0.25, 3) }
 function zoomOut()   { scale.value = Math.max(scale.value - 0.25, 0.5) }
-function zoomReset() { scale.value = 1.2 }
+function zoomReset() { scale.value = 1.0 }
 watch(scale, async () => { await nextTick(); await renderAllPages() })
 
 // ─── Canvas pixel position ────────────────────────────────────────────
@@ -712,13 +729,23 @@ function globalMouseUp() {
   if (hlDrag.active)   hlDrag.active   = false
 }
 
+// re-render saat window resize supaya scale menyesuaikan lebar baru
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
+function onWindowResize() {
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => { renderAllPages() }, 150)
+}
+
 onMounted(async () => {
   await loadPdf()
   window.addEventListener('mouseup', globalMouseUp)
+  window.addEventListener('resize', onWindowResize)
   window.addEventListener('scroll-to-comment', ((e: CustomEvent) => scrollToComment(e.detail.id)) as EventListener)
 })
 onUnmounted(() => {
   window.removeEventListener('mouseup', globalMouseUp)
+  window.removeEventListener('resize', onWindowResize)
+  if (resizeTimer) clearTimeout(resizeTimer)
   if (pdfDoc) pdfDoc.destroy()
 })
 watch(() => props.pdfUrl, () => loadPdf())
@@ -757,7 +784,7 @@ watch(() => props.pdfUrl, () => loadPdf())
 }
 
 /* Scroll */
-.pdf-scroll { flex: 1; overflow-y: auto; overflow-x: auto; padding: 64px 24px 40px; }
+.pdf-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 64px 24px 40px; }
 .pdf-loading {
   display: flex; flex-direction: column; align-items: center;
   justify-content: center; height: 100%; gap: 16px;
