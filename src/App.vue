@@ -30,13 +30,24 @@
         <PdfViewer
           :pdf-url="document.pdfUrl"
           :document-id="document.documentId"
-          :class="{ 'sidebar-open': isSidebarOpen }"
+          class="pdf-area"
         />
+
+        <!-- backdrop saat sidebar overlay di layar kecil -->
+        <Transition name="fade-backdrop">
+          <div
+            v-if="isSidebarOpen && isSmallScreen"
+            class="sidebar-backdrop"
+            @click="isSidebarOpen = false"
+          />
+        </Transition>
 
         <Transition name="slide-sidebar">
           <CommentSidebar
             v-if="isSidebarOpen"
             :document-id="document.documentId"
+            class="sidebar-panel"
+            :class="{ overlay: isSmallScreen }"
           />
         </Transition>
       </template>
@@ -45,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AppHeader from './components/AppHeader.vue'
 import PdfViewer from './components/PdfViewer.vue'
 import CommentSidebar from './components/CommentSidebar.vue'
@@ -53,19 +64,32 @@ import { getDocumentById } from './services/documentService'
 import { usePdfCommentStore } from './stores/pdfCommentStore'
 import type { PdfDocument } from './types/document'
 
-const commentStore = usePdfCommentStore()
-
-const document = ref<PdfDocument | null>(null)
-const loadingDoc = ref(true)
-const docError = ref<string | null>(null)
+const commentStore  = usePdfCommentStore()
+const document      = ref<PdfDocument | null>(null)
+const loadingDoc    = ref(true)
+const docError      = ref<string | null>(null)
 const isSidebarOpen = ref(true)
+const isSmallScreen = ref(false)
+
+function checkScreen() {
+  const small = window.innerWidth < 1024
+  // kalau baru masuk layar kecil, tutup sidebar otomatis
+  if (small && !isSmallScreen.value) {
+    isSidebarOpen.value = false
+  }
+  // balik ke layar besar, buka lagi
+  if (!small && isSmallScreen.value) {
+    isSidebarOpen.value = true
+  }
+  isSmallScreen.value = small
+}
 
 async function loadDocument() {
   loadingDoc.value = true
-  docError.value = null
+  docError.value   = null
   try {
     const doc = await getDocumentById('aceh-001')
-    document.value = doc
+    document.value  = doc
     await commentStore.loadComments(doc.documentId)
   } catch (e) {
     docError.value = e instanceof Error ? e.message : 'Failed to load document'
@@ -75,7 +99,13 @@ async function loadDocument() {
 }
 
 onMounted(() => {
+  checkScreen()
+  window.addEventListener('resize', checkScreen)
   loadDocument()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkScreen)
 })
 </script>
 
@@ -94,13 +124,43 @@ onMounted(() => {
   position: relative;
 }
 
+/* PDF pakai sisa ruang */
+.pdf-area {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Sidebar default: push PDF (desktop) */
+.sidebar-panel {
+  flex-shrink: 0;
+  width: var(--sidebar-width);
+}
+
+/* Sidebar overlay: melayang di atas PDF (tablet/mobile) */
+.sidebar-panel.overlay {
+  position: fixed;
+  top: var(--header-height);
+  right: 0;
+  bottom: 0;
+  width: min(var(--sidebar-width), 88vw);
+  z-index: 60;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+}
+
+/* Backdrop gelap di belakang sidebar overlay */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 55;
+}
+
 .state-screen {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .state-inner {
   display: flex;
   flex-direction: column;
@@ -108,45 +168,24 @@ onMounted(() => {
   gap: 16px;
   color: var(--color-text-muted);
 }
-
-.state-inner.error {
-  color: #dc2626;
-}
-
-.state-label {
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
-}
-
+.state-inner.error { color: #dc2626; }
+.state-label { font-size: 14px; font-weight: 500; margin: 0; }
 .spinner {
-  width: 36px;
-  height: 36px;
+  width: 36px; height: 36px;
   border: 2px solid var(--color-border);
   border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+@keyframes spin { to { transform: rotate(360deg); } }
 .btn-primary {
   padding: 8px 20px;
-  background: var(--color-accent);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
+  background: var(--color-accent); color: white;
+  border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; font-family: inherit;
 }
-
-.btn-primary:hover {
-  background: var(--color-accent-dark);
-}
+.btn-primary:hover { background: var(--color-accent-dark); }
 
 .slide-sidebar-enter-active,
 .slide-sidebar-leave-active {
@@ -157,4 +196,9 @@ onMounted(() => {
   transform: translateX(100%);
   opacity: 0;
 }
+
+.fade-backdrop-enter-active,
+.fade-backdrop-leave-active { transition: opacity 0.25s ease; }
+.fade-backdrop-enter-from,
+.fade-backdrop-leave-to { opacity: 0; }
 </style>

@@ -24,14 +24,6 @@ export function formatDateTime(dateStr: string): string {
   return `${day} ${month}, ${hh}:${mm}`
 }
 
-export function formatStatusTime(dateStr: string): string {
-  const d = new Date(dateStr)
-  const day   = String(d.getDate()).padStart(2, '0')
-  const month = d.toLocaleDateString('id-ID', { month: 'short' })
-  const hh    = String(d.getHours()).padStart(2, '0')
-  const mm    = String(d.getMinutes()).padStart(2, '0')
-  return `${day} ${month}, ${hh}:${mm}`
-}
 
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
