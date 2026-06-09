@@ -33,21 +33,11 @@
           class="pdf-area"
         />
 
-        <!-- backdrop saat sidebar overlay di layar kecil -->
-        <Transition name="fade-backdrop">
-          <div
-            v-if="isSidebarOpen && isSmallScreen"
-            class="sidebar-backdrop"
-            @click="isSidebarOpen = false"
-          />
-        </Transition>
-
         <Transition name="slide-sidebar">
           <CommentSidebar
             v-if="isSidebarOpen"
             :document-id="document.documentId"
             class="sidebar-panel"
-            :class="{ overlay: isSmallScreen }"
           />
         </Transition>
       </template>
@@ -69,19 +59,10 @@ const document      = ref<PdfDocument | null>(null)
 const loadingDoc    = ref(true)
 const docError      = ref<string | null>(null)
 const isSidebarOpen = ref(true)
-const isSmallScreen = ref(false)
 
+// tutup sidebar otomatis saat layar < 768px
 function checkScreen() {
-  const small = window.innerWidth < 1024
-  // kalau baru masuk layar kecil, tutup sidebar otomatis
-  if (small && !isSmallScreen.value) {
-    isSidebarOpen.value = false
-  }
-  // balik ke layar besar, buka lagi
-  if (!small && isSmallScreen.value) {
-    isSidebarOpen.value = true
-  }
-  isSmallScreen.value = small
+  isSidebarOpen.value = window.innerWidth >= 768
 }
 
 async function loadDocument() {
@@ -124,37 +105,33 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* PDF pakai sisa ruang */
+/* PDF selalu ambil sisa ruang, min-width:0 cegah overflow */
 .pdf-area {
   flex: 1;
   min-width: 0;
 }
 
-/* Sidebar default: push PDF (desktop) */
+/* Sidebar: lebar fixed di desktop */
 .sidebar-panel {
   flex-shrink: 0;
-  width: var(--sidebar-width);
+  width: var(--sidebar-width); /* 340px */
 }
 
-/* Sidebar overlay: melayang di atas PDF (tablet/mobile) */
-.sidebar-panel.overlay {
-  position: fixed;
-  top: var(--header-height);
-  right: 0;
-  bottom: 0;
-  width: min(var(--sidebar-width), 88vw);
-  z-index: 60;
-  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+/* Tablet (768px - 1199px): sidebar lebih sempit */
+@media (max-width: 1199px) {
+  .sidebar-panel {
+    width: 280px;
+  }
 }
 
-/* Backdrop gelap di belakang sidebar overlay */
-.sidebar-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.35);
-  z-index: 55;
+/* Tablet kecil (< 768px): sidebar full width karena sudah auto-hide di atas */
+@media (max-width: 767px) {
+  .sidebar-panel {
+    width: 240px;
+  }
 }
 
+/* State screens */
 .state-screen {
   flex: 1;
   display: flex;
@@ -196,9 +173,4 @@ onUnmounted(() => {
   transform: translateX(100%);
   opacity: 0;
 }
-
-.fade-backdrop-enter-active,
-.fade-backdrop-leave-active { transition: opacity 0.25s ease; }
-.fade-backdrop-enter-from,
-.fade-backdrop-leave-to { opacity: 0; }
 </style>
